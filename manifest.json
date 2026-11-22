@@ -1,0 +1,15 @@
+{
+  "name": "DEFTER Libro Contable",
+  "short_name": "DEFTER",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0e12",
+  "theme_color": "#0a0e12",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2489/2489756.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
