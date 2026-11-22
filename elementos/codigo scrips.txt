@@ -1,0 +1,377 @@
+/**
+ * DEFTER – Libro Contable
+ * Backend Google Apps Script (Versión Definitiva 2026)
+ */
+
+const HOJA_CONFIG = "_Config";
+const HOJA_NOTAS  = "_Notas";
+const ID_HEADER   = "_id";
+const SECRET_TOKEN = "DEFTER_SECRET_2026"; // ⚠️ Debe coincidir con el del index.html
+
+const SHEETS_IGNORADAS = ["_Config", "_Notas", "Categorías", "Ajustes"];
+const DEFAULT_SHEET_NAMES = ["Hoja 1", "Hoja 2", "Hoja 3", "Sheet1", "Sheet2", "Sheet3"];
+
+/* ============================================================
+   ENTRADA HTTP
+   ============================================================ */
+
+function doGet(e) {
+  try {
+    if (e.parameter.token !== SECRET_TOKEN) return jsonOut({ ok: false, error: "No autorizado." });
+    const action = e.parameter.action || "";
+
+    if (action === "getState") return jsonOut(getStateData());
+
+    return jsonOut({ ok: false, error: "Acción GET no soportada." });
+  } catch (err) {
+    return jsonOut({ ok: false, error: String(err) });
+  }
+}
+
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) return jsonOut({ ok: false, error: "Body vacío." });
+    const body = JSON.parse(e.postData.contents);
+    if (body.token !== SECRET_TOKEN) return jsonOut({ ok: false, error: "No autorizado." });
+
+    // Bloqueo para evitar colisiones de escritura
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+
+    let result;
+    switch (body.action) {
+      case "addTransaction":    result = addTransaction(body); break;
+      case "editTransaction":   result = editTransaction(body); break;
+      case "deleteTransaction": result = deleteTransaction(body); break;
+      case "addAccount":        result = addAccount(body); break;
+      case "addCategory":       result = addCategory(body); break;
+      case "editCategory":      result = editCategory(body); break;
+      case "deleteCategory":    result = deleteCategory(body); break;
+      case "saveNote":          result = saveNote(body); break;
+      case "editNote":          result = editNote(body); break;
+      case "deleteNote":        result = deleteNote(body); break;
+      default: result = { ok: false, error: "Acción no soportada." };
+    }
+    lock.releaseLock();
+    return jsonOut(result);
+  } catch (err) {
+    return jsonOut({ ok: false, error: String(err) });
+  }
+}
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function jsonOut(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+function getSS() { return SpreadsheetApp.getActiveSpreadsheet(); }
+function isConfigSheet(name) { return SHEETS_IGNORADAS.indexOf(name) !== -1; }
+function isDefaultEmptySheet(sheet) {
+  const name = sheet.getName().replace(/\s+/g, "").toLowerCase();
+  const isDefault = DEFAULT_SHEET_NAMES.some(n => n.replace(/\s+/g, "").toLowerCase() === name);
+  return isDefault && sheet.getLastRow() <= 1;
+}
+
+function ensureSheetHeader(sheet) {
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, 6).setValues([["Fecha", "Categoría", "Tipo", "Descripción", "Monto", ID_HEADER]]);
+  } else if (String(sheet.getRange(1, 6).getValue()).trim() === "") {
+    sheet.getRange(1, 6).setValue(ID_HEADER);
+  }
+}
+
+function parseDateAny(v) {
+  if (v instanceof Date && !isNaN(v.getTime())) return v;
+  if (!v) return null;
+  const d = new Date(String(v).replace(" ", "T"));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function fmtDateTime(d) {
+  if (!d) return "";
+  const pad = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function listAccountSheets() {
+  return getSS().getSheets().filter(s => !isConfigSheet(s.getName()) && !isDefaultEmptySheet(s));
+}
+
+/* ============================================================
+   HOJAS INTERNAS
+   ============================================================ */
+
+function getOrCreateConfig() {
+  let sheet = getSS().getSheetByName(HOJA_CONFIG);
+  if (!sheet) {
+    sheet = getSS().insertSheet(HOJA_CONFIG);
+    sheet.getRange(1, 1, 1, 5).setValues([["Tipo", "ID", "Nombre", "ParentID", "Contenido"]]);
+  }
+  return sheet;
+}
+
+function getOrCreateNotas() {
+  let sheet = getSS().getSheetByName(HOJA_NOTAS);
+  if (!sheet) {
+    sheet = getSS().insertSheet(HOJA_NOTAS);
+    sheet.getRange(1, 1, 1, 4).setValues([["ID", "Título", "Contenido", "Fecha"]]);
+  }
+  return sheet;
+}
+
+/* ============================================================
+   ESTADO COMPLETO
+   ============================================================ */
+
+function getStateData() {
+  const accounts = [];
+  const transactions = [];
+
+  listAccountSheets().forEach(sheet => {
+    ensureSheetHeader(sheet);
+    const name = sheet.getName();
+    const lastRow = sheet.getLastRow();
+    let balance = 0;
+    let idWrites = [];
+
+    if (lastRow > 1) {
+      const values = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+      values.forEach((row, idx) => {
+        if (!row[0] && !row[3] && !row[4]) return; // Fila vacía
+
+        let id = String(row[5] || "").trim();
+        if (!id) {
+          id = `legacy_${name.replace(/\s+/g, "_")}_${idx + 2}`; // ID FIJO
+          idWrites.push({ row: idx + 2, id: id });
+        }
+
+        const monto = Number(row[4]) || 0;
+        balance += monto;
+
+        const dateObj = parseDateAny(row[0]);
+        transactions.push({
+          id: id, account: name,
+          category: String(row[1] || ""), type: String(row[2] || ""),
+          description: String(row[3] || ""),
+          amount: Math.abs(monto), signedAmount: monto,
+          datetime: dateObj ? fmtDateTime(dateObj) : ""
+        });
+      });
+      idWrites.forEach(w => sheet.getRange(w.row, 6).setValue(w.id));
+    }
+    accounts.push({ name: name, balance: balance });
+  });
+
+  // Categorías
+  const categories = [];
+  const config = getOrCreateConfig();
+  if (config.getLastRow() > 1) {
+    config.getRange(2, 1, config.getLastRow() - 1, 5).getValues().forEach(row => {
+      if (String(row[0]).trim().toLowerCase() === "cat" && row[1]) {
+        categories.push({
+          id: String(row[1]), name: String(row[2]),
+          kind: (row[3] === "group" || row[3] === "") ? "group" : "item",
+          parentId: row[3] === "group" ? "" : String(row[3])
+        });
+      }
+    });
+  }
+
+  // Notas (hoja independiente)
+  const notes = [];
+  const notasSheet = getOrCreateNotas();
+  if (notasSheet.getLastRow() > 1) {
+    notasSheet.getRange(2, 1, notasSheet.getLastRow() - 1, 4).getValues().forEach(row => {
+      if (row[0]) notes.push({ id: String(row[0]), title: String(row[1]), content: String(row[2]), date: String(row[3]) });
+    });
+  }
+
+  return { ok: true, accounts, transactions, categories, notes };
+}
+
+/* ============================================================
+   TRANSACCIONES
+   ============================================================ */
+
+function getOrCreateAccountSheet(name) {
+  let sheet = getSS().getSheetByName(name);
+  if (!sheet) sheet = getSS().insertSheet(name);
+  ensureSheetHeader(sheet);
+  return sheet;
+}
+
+function saveTxToSheet(sheet, dt, cat, type, desc, amount, id) {
+  const dateObj = dt instanceof Date ? dt : (parseDateAny(dt) || new Date());
+  sheet.appendRow([dateObj, cat, type, desc, Number(amount), id]);
+  const r = sheet.getLastRow();
+  sheet.getRange(r, 1).setNumberFormat("yyyy-mm-dd hh:mm");
+  sheet.getRange(r, 5).setNumberFormat("$#,##0.00");
+}
+
+function addTransaction(body) {
+  const type = String(body.type || "").trim();
+  const amountAbs = Math.abs(Number(body.amount) || 0);
+  if (!type || amountAbs <= 0) return { ok: false, error: "Datos inválidos." };
+
+  const dt = body.datetime || new Date();
+  const cat = String(body.category || "").trim();
+  const desc = String(body.description || "").trim();
+  const id = "tx_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+
+  if (type === "Transferencia") {
+    const from = String(body.fromAccount || "").trim();
+    const to = String(body.toAccount || "").trim();
+    if (!from || !to || from === to) return { ok: false, error: "Cuentas inválidas." };
+
+    saveTxToSheet(getOrCreateAccountSheet(from), dt, cat, "Transferencia", "Envío a " + to, -amountAbs, id);
+    saveTxToSheet(getOrCreateAccountSheet(to), dt, cat, "Transferencia", "Recibido de " + from, amountAbs, "tx_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6));
+    return { ok: true };
+  }
+
+  const account = String(body.account || "").trim();
+  if (!account) return { ok: false, error: "Cuenta requerida." };
+  const signed = type === "Ingreso" ? amountAbs : -amountAbs;
+  saveTxToSheet(getOrCreateAccountSheet(account), dt, cat, type, desc, signed, id);
+  return { ok: true };
+}
+
+function findTxById(id) {
+  for (let sheet of listAccountSheets()) {
+    const lr = sheet.getLastRow();
+    if (lr < 2) continue;
+    const vals = sheet.getRange(2, 1, lr - 1, 6).getValues();
+    for (let i = 0; i < vals.length; i++) {
+      if (String(vals[i][5]).trim() === id) return { sheet, rowIndex: i + 2, vals: vals[i] };
+    }
+  }
+  return null;
+}
+
+function deleteTransaction(body) {
+  const found = findTxById(String(body.id));
+  if (!found) return { ok: false, error: "No encontrada." };
+
+  // Si es transferencia, borrar contraparte
+  if (found.vals[2] === "Transferencia") {
+    const desc = found.vals[3];
+    const monto = found.vals[4];
+    let oppDesc = desc.startsWith("Envío a ") ? desc.replace("Envío a ", "Recibido de ") : desc.replace("Recibido de ", "Envío a ");
+
+    for (let s of listAccountSheets()) {
+      if (s.getName() === found.sheet.getName()) continue;
+      const lr = s.getLastRow();
+      if (lr < 2) continue;
+      const vals = s.getRange(2, 1, lr - 1, 6).getValues();
+      for (let i = vals.length - 1; i >= 0; i--) {
+        if (vals[i][2] === "Transferencia" && vals[i][3] === oppDesc && Math.abs(Number(vals[i][4]) + monto) < 0.01) {
+          s.deleteRow(i + 2);
+        }
+      }
+    }
+  }
+  found.sheet.deleteRow(found.rowIndex);
+  return { ok: true };
+}
+
+function editTransaction(body) {
+  const found = findTxById(String(body.id));
+  if (!found) return { ok: false, error: "No encontrada." };
+  const dt = parseDateAny(body.datetime) || new Date();
+  const amt = Math.abs(Number(body.amount) || 0);
+  const sign = Number(found.vals[4]) < 0 ? -1 : 1;
+
+  found.sheet.getRange(found.rowIndex, 1).setValue(dt);
+  found.sheet.getRange(found.rowIndex, 2).setValue(body.category || "");
+  found.sheet.getRange(found.rowIndex, 4).setValue(body.description || "");
+  found.sheet.getRange(found.rowIndex, 5).setValue(sign * amt);
+  found.sheet.getRange(found.rowIndex, 1).setNumberFormat("yyyy-mm-dd hh:mm");
+  found.sheet.getRange(found.rowIndex, 5).setNumberFormat("$#,##0.00");
+  return { ok: true };
+}
+
+/* ============================================================
+   CUENTAS
+   ============================================================ */
+
+function addAccount(body) {
+  const name = String(body.name || "").trim();
+  if (!name || /[\[\]\*\?\/\\:]/.test(name)) return { ok: false, error: "Nombre inválido." };
+  if (getSS().getSheetByName(name)) return { ok: false, error: "Ya existe." };
+  ensureSheetHeader(getSS().insertSheet(name));
+  return { ok: true };
+}
+
+/* ============================================================
+   CATEGORÍAS
+   ============================================================ */
+
+function addCategory(body) {
+  const name = String(body.name || "").trim();
+  const kind = body.kind;
+  const parent = kind === "group" ? "group" : body.parentId;
+  if (kind === "item" && !parent) return { ok: false, error: "Falta grupo padre." };
+  getOrCreateConfig().appendRow(["cat", "cat_" + Date.now(), name, parent, ""]);
+  return { ok: true };
+}
+
+function editCategory(body) {
+  const config = getOrCreateConfig();
+  if (config.getLastRow() < 2) return { ok: false, error: "Sin categorías." };
+  const vals = config.getRange(2, 1, config.getLastRow() - 1, 5).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    if (vals[i][0] === "cat" && String(vals[i][1]) === body.id) {
+      config.getRange(i + 2, 3).setValue(body.name);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: "No encontrada." };
+}
+
+function deleteCategory(body) {
+  const config = getOrCreateConfig();
+  if (config.getLastRow() < 2) return { ok: false, error: "Sin categorías." };
+  const vals = config.getRange(2, 1, config.getLastRow() - 1, 5).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    if (vals[i][0] === "cat" && String(vals[i][1]) === body.id) {
+      config.deleteRow(i + 2);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: "No encontrada." };
+}
+
+/* ============================================================
+   NOTAS
+   ============================================================ */
+
+function saveNote(body) {
+  getOrCreateNotas().appendRow(["note_" + Date.now(), body.title || "", body.content || "", new Date().toISOString()]);
+  return { ok: true };
+}
+
+function editNote(body) {
+  const sheet = getOrCreateNotas();
+  if (sheet.getLastRow() < 2) return { ok: false, error: "Sin notas." };
+  const vals = sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]) === body.id) {
+      sheet.getRange(i + 2, 2, 1, 2).setValues([[body.title || "", body.content || ""]]);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: "No encontrada." };
+}
+
+function deleteNote(body) {
+  const sheet = getOrCreateNotas();
+  if (sheet.getLastRow() < 2) return { ok: false, error: "Sin notas." };
+  const vals = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]) === body.id) {
+      sheet.deleteRow(i + 2);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: "No encontrada." };
+}

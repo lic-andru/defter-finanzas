@@ -660,7 +660,7 @@ function switchView(view) {
   document.querySelectorAll(".view").forEach(v => v.style.display = "none");
   document.getElementById("view-"+view).style.display = "block";
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-  event.target.classList.add("active");
+  if (event && event.target) event.target.classList.add("active");
   if (window.innerWidth <= 768) toggleNav();
 }
 
