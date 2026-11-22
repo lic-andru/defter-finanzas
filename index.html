@@ -9,36 +9,22 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
   :root {
-    --bg-base: #0a0e12; 
-    --panel: rgba(255,255,255,0.025); 
-    --border: rgba(255,255,255,0.08);
-    --text-main: #f5f7fa; 
-    --text-muted: #9aa7b4; 
-    --cyan: #22d3ee; 
-    --green: #34d399;
-    --red: #fb7185; 
-    --amber: #fbbf24; 
-    --blue: #60a5fa;
+    --bg-base: #0a0e12; --panel: rgba(255,255,255,0.025); --border: rgba(255,255,255,0.08);
+    --text-main: #f5f7fa; --text-muted: #9aa7b4; --cyan: #22d3ee; --green: #34d399;
+    --red: #fb7185; --amber: #fbbf24; --blue: #60a5fa;
   }
-  
   body.light-mode {
-    --bg-base: #f1f5f9; 
-    --panel: #ffffff; 
-    --border: #e2e8f0;
-    --text-main: #0f172a; 
-    --text-muted: #64748b; 
-    --cyan: #0891b2;
+    --bg-base: #f1f5f9; --panel: #ffffff; --border: #e2e8f0;
+    --text-main: #0f172a; --text-muted: #64748b; --cyan: #0891b2;
   }
 
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg-base); 
-    color: var(--text-main);
+    background: var(--bg-base); color: var(--text-main);
     transition: background 0.3s, color 0.3s;
   }
-  
   a { color: var(--cyan); text-decoration: none; }
   button { font-family: inherit; }
 
@@ -49,164 +35,195 @@
     position: sticky; top: 0; z-index: 40; backdrop-filter: blur(10px);
   }
   .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; }
-  .brand .logo { 
-    width: 30px; height: 30px; border-radius: 8px; 
-    background: linear-gradient(135deg,var(--cyan),#0ea5b7); 
-    display: flex; align-items: center; justify-content: center; 
-    color: #04161a; font-weight: 900; 
+  .brand .logo {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: linear-gradient(135deg,var(--cyan),#0ea5b7);
+    display: flex; align-items: center; justify-content: center;
+    color: #04161a; font-weight: 900;
   }
   .header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-  
-  .btn { 
-    border: 1px solid var(--border); background: var(--panel); color: var(--text-main); 
-    border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 600; 
-    cursor: pointer; transition: 0.2s; 
+
+  /* ================= ESTADO DE SINCRONIZACIÓN ================= */
+  .status-pill { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; transition: 0.3s; white-space: nowrap; }
+  .status-pill.syncing { background: rgba(251,191,36,0.15); color: var(--amber); animation: pulse 1.5s infinite; }
+  .status-pill.ok { background: rgba(52,211,153,0.15); color: var(--green); }
+  .status-pill.error { background: rgba(251,113,133,0.15); color: var(--red); }
+  @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+
+  .btn {
+    border: 1px solid var(--border); background: var(--panel); color: var(--text-main);
+    border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: 0.2s;
   }
   .btn:hover { background: rgba(128,128,128,0.1); }
   .btn-primary { background: var(--cyan); color: #04161a; border: none; }
-  .btn-primary:hover { filter: brightness(1.1); }
-  .icon-btn { background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 4px; transition: 0.2s; }
+  .icon-btn { background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 4px; }
   .icon-btn:hover { color: var(--text-main); transform: scale(1.1); }
-  
+
   /* ================= LAYOUT ================= */
-  .layout { 
-    display: grid; grid-template-columns: 200px 1fr; gap: 16px; 
-    padding: 16px; max-width: 1400px; margin: 0 auto; 
-    min-height: calc(100vh - 54px); 
+  .layout {
+    display: grid; grid-template-columns: 200px 1fr; gap: 16px;
+    padding: 16px; max-width: 1400px; margin: 0 auto;
+    min-height: calc(100vh - 54px);
   }
-  
+
   /* ================= NAV ================= */
   .nav { display: flex; flex-direction: column; gap: 4px; }
-  .nav-item { 
-    padding: 10px 14px; border-radius: 8px; font-weight: 600; font-size: 13px; 
-    cursor: pointer; color: var(--text-muted); transition: 0.2s;
+  .nav-item {
+    padding: 10px 14px; border-radius: 8px; font-weight: 600; font-size: 13px;
+    cursor: pointer; color: var(--text-muted); transition: 0.2s; display: flex; align-items: center; gap: 8px;
   }
   .nav-item:hover { background: rgba(128,128,128,0.05); color: var(--text-main); }
   .nav-item.active { background: var(--panel); color: var(--cyan); border: 1px solid var(--border); }
 
   /* ================= MAIN ================= */
   .center { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-  .banner { 
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; 
-    padding: 20px; display: flex; justify-content: space-between; align-items: center; 
+  .banner {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; display: flex; justify-content: space-between; align-items: center;
   }
   .banner h2 { margin: 0; font-size: 24px; }
   .banner .big { font-size: 28px; font-weight: 800; color: var(--cyan); }
 
-  /* ================= TABLES & LISTS ================= */
+  /* ================= TABLES ================= */
   .table-wrap { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-  .table-head { 
-    padding: 12px 16px; border-bottom: 1px solid var(--border); 
-    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; 
-  }
+  .table-head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; align-items: center; }
   .ledger { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .ledger th { 
-    text-align: left; padding: 10px 16px; color: var(--text-muted); 
-    font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--border); 
+  .ledger th {
+    text-align: left; padding: 10px 16px; color: var(--text-muted);
+    font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--border);
   }
   .ledger td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
   .ledger tr:last-child td { border-bottom: none; }
-  .ledger tr:hover td { background: rgba(128,128,128,0.02); }
-  
-  /* Ajuste de anchos para que la tabla respire bien en PC */
-  .ledger th:nth-child(1) { width: 45%; } 
-  .ledger th:nth-child(2) { width: 20%; text-align: right; } 
-  .ledger th:nth-child(3) { width: 20%; text-align: right; } 
-  .ledger th:nth-child(4) { width: 15%; text-align: right; } 
-  
+
+  .ledger th:nth-child(1) { width: 45%; }
+  .ledger th:nth-child(2) { width: 20%; text-align: right; }
+  .ledger th:nth-child(3) { width: 20%; text-align: right; }
+  .ledger th:nth-child(4) { width: 15%; text-align: right; }
+
   .desc-main { font-weight: 600; font-size: 14px; margin-bottom: 4px; color: var(--text-main); }
   .desc-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 2px; }
   .amount-pos { color: var(--green); font-weight: 700; }
   .amount-neg { color: var(--red); font-weight: 700; }
 
-  /* ================= QUICKBAR (Formulario) ================= */
-  .quickbar { 
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; 
-    padding: 16px; display: flex; gap: 12px; flex-wrap: wrap; 
-  }
-  .quickbar input, .quickbar select { 
-    background: var(--bg-base); border: 1px solid var(--border); border-radius: 8px; 
-    padding: 10px; color: var(--text-main); font-size: 13px; outline: none; 
-    flex: 1; min-width: 120px; transition: border 0.2s;
-  }
-  .quickbar input:focus, .quickbar select:focus { border-color: var(--cyan); }
-  
   /* ================= CHARTS ================= */
   .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .chart-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
-  
+
   /* ================= NOTES & CATS ================= */
   .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
-  .note-card { 
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; 
-    padding: 16px; display: flex; flex-direction: column; gap: 8px; 
-    transition: transform 0.2s, box-shadow 0.2s;
-  }
+  .note-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; }
   .note-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-  
+
+  /* ================= FORMULARIOS ================= */
+  .form-container { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .form-container input, .form-container select, .form-container textarea {
+    background: var(--bg-base); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px; color: var(--text-main); font-size: 13px; outline: none; width: 100%;
+  }
+  .form-container input:focus, .form-container select:focus, .form-container textarea:focus { border-color: var(--cyan); }
+  .form-row { display: flex; gap: 10px; }
+  .form-row > * { flex: 1; }
+
+  /* ================= QUICKBAR DESKTOP ================= */
+  .quickbar-desktop {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+  }
+  .quickbar-desktop input, .quickbar-desktop select {
+    background: var(--bg-base); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px; color: var(--text-main); font-size: 13px; outline: none;
+    flex: 1; min-width: 120px;
+  }
+
+  /* ================= MODALES ================= */
+  .modal { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(3,6,9,.7); backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 16px; }
+  .modal.open { display: flex; }
+  .modal-card { width: 100%; max-width: 400px; background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .modal-card h3 { margin: 0 0 16px; font-size: 16px; }
+  .modal-card label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin: 10px 0 4px; font-weight: 600; }
+  .modal-card input, .modal-card select {
+    width: 100%; background: var(--bg-base); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; color: var(--text-main); font-size: 13px; outline: none;
+  }
+
+  /* ================= FAB (+) ================= */
+  .fab {
+    display: none; position: fixed; bottom: 20px; right: 20px;
+    width: 60px; height: 60px; border-radius: 50%;
+    background: var(--cyan); color: #04161a; font-size: 32px; font-weight: bold;
+    border: none; box-shadow: 0 4px 12px rgba(34,211,238,0.4);
+    z-index: 90; cursor: pointer; align-items: center; justify-content: center;
+  }
+
   /* ================= RESPONSIVE MOBILE ================= */
   @media (max-width: 768px) {
     .layout { grid-template-columns: 1fr; padding: 10px; }
-    .nav { 
-      flex-direction: row; overflow-x: auto; padding-bottom: 8px; 
-      border-bottom: 1px solid var(--border); margin-bottom: 8px;
+
+    /* Menú lateral deslizable */
+    .nav {
+      display: flex; position: fixed; top: 54px; left: 0; bottom: 0; width: 75%;
+      background: var(--bg-base); z-index: 60; padding: 20px;
+      border-right: 1px solid var(--border); box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+      transform: translateX(-100%); transition: transform 0.3s ease;
+      flex-direction: column;
     }
-    .nav-item { white-space: nowrap; padding: 8px 12px; }
-    
+    .nav.open { transform: translateX(0); }
+    .nav-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 55; }
+    .nav-overlay.open { display: block; }
+
+    .hamburger { display: block !important; background: transparent; border: none; color: var(--text-main); font-size: 24px; margin-right: 8px; cursor: pointer; }
+
     .charts-grid { grid-template-columns: 1fr; }
-    
-    /* Transformar tabla en tarjetas en celular */
+
+    /* Tabla como tarjetas */
     .ledger thead { display: none; }
-    .ledger tr { 
-      display: flex; flex-direction: column; 
-      border-bottom: 1px solid var(--border); padding: 14px; 
-    }
+    .ledger tr { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); padding: 14px; position: relative; }
     .ledger td { display: block; border: none; padding: 2px 0; text-align: left !important; }
-    
-    /* Los montos se alinean a la derecha pero en su propia línea */
-    .ledger td:nth-child(2), .ledger td:nth-child(3) { 
-      display: inline-block; width: 48%; font-size: 14px; margin-top: 6px;
-    }
-    .ledger td:nth-child(3) { text-align: right !important; color: var(--text-muted); }
-    .ledger td:nth-child(4) { position: absolute; right: 14px; top: 14px; }
-    
-    /* El menú rápido se fija abajo como app nativa */
-    .quickbar { 
-      flex-direction: column; position: fixed; bottom: 0; left: 0; right: 0; 
-      border-radius: 16px 16px 0 0; z-index: 50; 
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.2); padding-bottom: 20px; 
-      background: var(--panel); backdrop-filter: blur(10px);
-    }
-    .quickbar input, .quickbar select { width: 100%; }
-    
-    /* IMPORTANTE: Espacio para que la tabla no quede escondida detrás del menú */
-    .main-content { padding-bottom: 320px; } 
+
+    .ledger td:nth-child(2) { position: absolute; right: 14px; top: 14px; text-align: right !important; font-size: 15px; }
+    .ledger td:nth-child(3) { display: none; }
+    .ledger td:nth-child(4) { position: absolute; right: 14px; bottom: 14px; }
+
+    .fab { display: flex; }
+    .quickbar-desktop { display: none !important; }
+    .hide-mobile { display: none !important; }
+
+    .main-content { padding-bottom: 100px; }
   }
+
+  .hamburger { display: none; }
+  .hide-mobile { display: inline-block; }
 </style>
 </head>
 <body>
 
 <header class="header">
+  <button class="hamburger" onclick="toggleNav()">☰</button>
   <div class="brand"><div class="logo">D</div><span>DEFTER</span></div>
   <div class="header-actions">
+    <span id="statusIndicator" class="status-pill ok">Sincronizado</span>
     <button class="icon-btn" onclick="toggleTheme()" id="themeBtn">🌙</button>
-    <button class="btn btn-primary hide-mobile" onclick="openModal('txModal')">+ Transacción</button>
+    <button class="btn hide-mobile" onclick="openModal('txModal')">+ Transacción</button>
   </div>
 </header>
 
+<div class="nav-overlay" id="navOverlay" onclick="toggleNav()"></div>
+
 <div class="layout">
   <!-- NAV -->
-  <aside class="nav">
+  <aside class="nav" id="navMenu">
     <div class="nav-item active" onclick="switchView('accounts')">💳 Cuentas</div>
     <div class="nav-item" onclick="switchView('reports')">📊 Informes</div>
     <div class="nav-item" onclick="switchView('categories')">🏷️ Categorías</div>
     <div class="nav-item" onclick="switchView('notes')">📝 Notas</div>
-    <button class="btn" style="margin-top:auto;" onclick="backupData()">☁️ Backup</button>
+    <div style="flex:1;"></div>
+    <button class="btn" onclick="loadState()">🔄 Sincronizar</button>
   </aside>
 
   <!-- MAIN CONTENT -->
   <main class="center main-content">
-    
+
     <!-- VIEW: CUENTAS -->
     <section id="view-accounts" class="view">
       <div class="banner">
@@ -258,27 +275,32 @@
 
     <!-- VIEW: CATEGORÍAS -->
     <section id="view-categories" class="view" style="display:none;">
-      <div class="quickbar" style="position:static; margin-bottom:16px; padding:12px;">
-        <input id="catName" placeholder="Nombre de categoría">
-        <select id="catKind"><option value="group">Grupo</option><option value="item">Subcategoría</option></select>
-        <select id="catParent"></select>
-        <button class="btn btn-primary" onclick="createCategory()">+ Crear</button>
+      <div class="form-container" style="margin-bottom:16px;">
+        <div class="form-row">
+          <input id="catName" placeholder="Nombre de categoría">
+          <select id="catKind">
+            <option value="group">Grupo</option>
+            <option value="item">Subcategoría</option>
+          </select>
+          <select id="catParent"></select>
+        </div>
+        <button class="btn btn-primary" onclick="createCategory()">+ Crear Categoría</button>
       </div>
       <div id="catList"></div>
     </section>
 
     <!-- VIEW: NOTAS -->
     <section id="view-notes" class="view" style="display:none;">
-      <div class="quickbar" style="position:static; margin-bottom:16px; padding:12px; flex-direction:column;">
+      <div class="form-container" style="margin-bottom:16px;">
         <input id="noteTitle" placeholder="Título de nota">
-        <textarea id="noteContent" placeholder="Contenido..." style="min-height:60px; background:var(--bg-base); border:1px solid var(--border); color:var(--text-main); border-radius:8px; padding:10px;"></textarea>
+        <textarea id="noteContent" placeholder="Contenido..." style="min-height:60px;"></textarea>
         <button class="btn btn-primary" onclick="createNote()">+ Guardar Nota</button>
       </div>
       <div class="card-grid" id="notesGrid"></div>
     </section>
 
-    <!-- QUICKBAR FIXED EN MOVIL -->
-    <div class="quickbar" id="quickbar">
+    <!-- QUICKBAR DESKTOP -->
+    <div class="quickbar-desktop">
       <input id="qAmount" type="number" placeholder="Monto" step="0.01">
       <input id="qDesc" placeholder="Descripción">
       <input id="qDate" type="datetime-local">
@@ -288,6 +310,36 @@
       <button class="btn" style="color:var(--red);" onclick="submitQuick('Gasto')">Gasto</button>
     </div>
   </main>
+</div>
+
+<!-- FAB (+) MÓVIL -->
+<button class="fab" onclick="openModal('txModal')">+</button>
+
+<!-- MODAL TRANSACCIÓN -->
+<div class="modal" id="txModal">
+  <div class="modal-card">
+    <h3>Nueva Transacción</h3>
+    <label>Tipo</label>
+    <select id="mType">
+      <option value="Ingreso">Ingreso</option>
+      <option value="Gasto">Gasto</option>
+      <option value="Transferencia">Transferencia</option>
+    </select>
+    <label>Monto</label>
+    <input id="mAmount" type="number" step="0.01" placeholder="0.00">
+    <label>Categoría</label>
+    <select id="mCategory"></select>
+    <label>Descripción</label>
+    <input id="mDesc" placeholder="Opcional">
+    <label>Fecha</label>
+    <input id="mDate" type="datetime-local">
+    <label>Cuenta</label>
+    <select id="mAccount"></select>
+    <div class="form-row" style="margin-top:12px;">
+      <button class="btn btn-primary" onclick="submitModal()">Guardar</button>
+      <button class="btn" onclick="closeModal('txModal')">Cancelar</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -301,74 +353,103 @@ let barChart, donutChart;
 
 /* ========== UTILS ========== */
 function fmtMoney(n) { return "$" + (Number(n)||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function getLocalISO() {
   const d = new Date();
   const pad = n => String(n).padStart(2,'0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/* Reloj automático (cada minuto actualiza si no se ha tocado) */
+/* ========== INDICADOR DE ESTADO ========== */
+function setStatus(status) {
+  const el = document.getElementById("statusIndicator");
+  if (!el) return;
+  el.className = "status-pill " + status;
+  if (status === "syncing") el.textContent = "Sincronizando...";
+  else if (status === "ok") el.textContent = "Sincronizado";
+  else if (status === "error") el.textContent = "Error del servidor";
+}
+
+/* ========== RELOJ AUTOMÁTICO ========== */
 setInterval(() => {
   const qDate = document.getElementById("qDate");
   if (qDate && !qDate.dataset.manual) qDate.value = getLocalISO();
 }, 60000);
 
+/* ========== TEMA ========== */
 function toggleTheme() {
   document.body.classList.toggle("light-mode");
   const isLight = document.body.classList.contains("light-mode");
   document.getElementById("themeBtn").textContent = isLight ? "☀️" : "🌙";
   localStorage.setItem("theme", isLight ? "light" : "dark");
 }
-if (localStorage.getItem("theme") === "light") toggleTheme();
+if (localStorage.getItem("theme") === "light") {
+  document.body.classList.add("light-mode");
+  document.getElementById("themeBtn").textContent = "☀️";
+}
+
+/* ========== NAV MÓVIL ========== */
+function toggleNav() {
+  document.getElementById("navMenu").classList.toggle("open");
+  document.getElementById("navOverlay").classList.toggle("open");
+}
+
+/* ========== MODALES ========== */
+function openModal(id) { document.getElementById(id).classList.add("open"); }
+function closeModal(id) { document.getElementById(id).classList.remove("open"); }
 
 /* ========== API ========== */
 async function api(params) {
   params.token = TOKEN;
-  const isGet = params.action === "getState" || params.action === "backupData";
+  const isGet = params.action === "getState";
   let url = API_URL;
   let opts = {};
-  
-  if (isGet) {
-    const qs = Object.keys(params).map(k => k+"="+encodeURIComponent(params[k])).join("&");
-    url += "?" + qs;
-  } else {
-    opts = { method: "POST", body: JSON.stringify(params) };
-  }
-  
+
+  setStatus("syncing");
+
   try {
+    if (isGet) {
+      const qs = Object.keys(params).map(k => k+"="+encodeURIComponent(params[k])).join("&");
+      url += "?" + qs;
+    } else {
+      opts = { method: "POST", body: JSON.stringify(params) };
+    }
+
     const res = await fetch(url, opts);
-    return await res.json();
+    const data = await res.json();
+    setStatus("ok");
+    return data;
   } catch(e) {
-    alert("Error de red o conexión a Google.");
+    setStatus("error");
+    alert("Error de conexión con el servidor.");
     return { ok: false };
   }
 }
 
 async function loadState() {
+  setStatus("syncing");
   const res = await api({ action: "getState" });
   if (res.ok) {
     state = res;
-    if (!activeAccount) activeAccount = state.accounts[0]?.name;
+    if (!activeAccount && state.accounts.length) activeAccount = state.accounts[0].name;
     renderAll();
-  }
-}
-
-function backupData() {
-  if(confirm("¿Crear copia de seguridad en Google Drive?")) {
-    api({ action: "backupData" }).then(r => alert(r.ok ? "Backup creado." : "Error"));
+    setStatus("ok");
+  } else {
+    setStatus("error");
   }
 }
 
 /* ========== RENDER ========== */
 function renderAll() {
-  // Selects
   const accOpts = state.accounts.map(a => `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join("");
   const catOpts = state.categories.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join("");
+
   document.getElementById("qAccount").innerHTML = accOpts;
   document.getElementById("qCategory").innerHTML = catOpts;
+  document.getElementById("mAccount").innerHTML = accOpts;
+  document.getElementById("mCategory").innerHTML = catOpts;
   document.getElementById("catParent").innerHTML = state.categories.filter(c=>c.kind==='group').map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("");
-  
+
   renderLedger();
   renderCategories();
   renderNotes();
@@ -380,16 +461,15 @@ function renderLedger() {
   document.getElementById("activeName").textContent = activeAccount;
   const acc = state.accounts.find(a => a.name === activeAccount);
   document.getElementById("activeBalance").textContent = fmtMoney(acc?.balance || 0);
-  
+
   let txs = state.transactions.filter(t => t.account === activeAccount).sort((a,b) => new Date(a.datetime) - new Date(b.datetime));
-  
-  // Filtro fecha
+
   const filterDate = document.getElementById("filterDate").value;
   if (filterDate) txs = txs.filter(t => t.datetime.startsWith(filterDate));
-  
+
   let running = 0;
   let html = "";
-  
+
   txs.forEach(t => {
     running += t.signedAmount;
     const sign = t.signedAmount >= 0 ? "+" : "";
@@ -404,22 +484,21 @@ function renderLedger() {
       <td><button class="icon-btn" onclick="delTx('${t.id}')">🗑️</button></td>
     </tr>`;
   });
-  
+
   document.getElementById("ledgerBody").innerHTML = html || "<tr><td colspan='4'>Sin movimientos</td></tr>";
 }
 
 function renderCharts() {
-  // Bar Chart
   const ctxBar = document.getElementById('barChart').getContext('2d');
   if(barChart) barChart.destroy();
-  
+
   let inc = 0, exp = 0;
   const byCat = {};
-  
+
   state.transactions.forEach(t => {
     if (t.signedAmount > 0) inc += t.signedAmount;
     else exp += Math.abs(t.signedAmount);
-    
+
     if (t.signedAmount < 0) {
       byCat[t.category || "Otros"] = (byCat[t.category || "Otros"] || 0) + Math.abs(t.signedAmount);
     }
@@ -434,7 +513,6 @@ function renderCharts() {
     options: { responsive: true, plugins: { legend: { display: false } } }
   });
 
-  // Donut Chart
   const ctxDonut = document.getElementById('donutChart').getContext('2d');
   if(donutChart) donutChart.destroy();
   donutChart = new Chart(ctxDonut, {
@@ -452,7 +530,7 @@ function renderCategories() {
   const groups = state.categories.filter(c => c.kind === "group");
   groups.forEach(g => {
     html += `<div style="margin-bottom:12px; background:var(--panel); padding:12px; border-radius:8px;">
-      <div style="font-weight:bold; display:flex; justify-content:space-between;">
+      <div style="font-weight:bold; display:flex; justify-content:space-between; align-items:center;">
         <span>${esc(g.name)}</span>
         <div>
           <button class="icon-btn" onclick="editCat('${g.id}', '${esc(g.name)}')">✏️</button>
@@ -460,7 +538,7 @@ function renderCategories() {
         </div>
       </div>`;
     state.categories.filter(c => c.parentId === g.id).forEach(sub => {
-      html += `<div style="padding:6px 0 6px 16px; display:flex; justify-content:space-between;">
+      html += `<div style="padding:6px 0 6px 16px; display:flex; justify-content:space-between; align-items:center;">
         <span>• ${esc(sub.name)}</span>
         <div>
           <button class="icon-btn" onclick="editCat('${sub.id}', '${esc(sub.name)}')">✏️</button>
@@ -495,12 +573,34 @@ async function submitQuick(type) {
   const dt = document.getElementById("qDate").value || getLocalISO();
   const cat = document.getElementById("qCategory").value;
   const acc = document.getElementById("qAccount").value;
-  
+
   if(!amt || amt <= 0) return alert("Monto inválido.");
-  
+
   const res = await api({ action:"addTransaction", type, amount:amt, description:desc, datetime:dt, category:cat, account:acc });
-  if(res.ok) { document.getElementById("qAmount").value=""; document.getElementById("qDesc").value=""; loadState(); }
-  else alert(res.error);
+  if(res.ok) {
+    document.getElementById("qAmount").value="";
+    document.getElementById("qDesc").value="";
+    loadState();
+  } else alert(res.error);
+}
+
+async function submitModal() {
+  const type = document.getElementById("mType").value;
+  const amt = Number(document.getElementById("mAmount").value);
+  const desc = document.getElementById("mDesc").value;
+  const dt = document.getElementById("mDate").value || getLocalISO();
+  const cat = document.getElementById("mCategory").value;
+  const acc = document.getElementById("mAccount").value;
+
+  if(!amt || amt <= 0) return alert("Monto inválido.");
+
+  const res = await api({ action:"addTransaction", type, amount:amt, description:desc, datetime:dt, category:cat, account:acc });
+  if(res.ok) {
+    closeModal('txModal');
+    document.getElementById("mAmount").value="";
+    document.getElementById("mDesc").value="";
+    loadState();
+  } else alert(res.error);
 }
 
 async function delTx(id) {
@@ -561,6 +661,7 @@ function switchView(view) {
   document.getElementById("view-"+view).style.display = "block";
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
   event.target.classList.add("active");
+  if (window.innerWidth <= 768) toggleNav();
 }
 
 function exportCSV() {
@@ -575,8 +676,9 @@ function exportCSV() {
   a.click();
 }
 
-// Inicializar
+/* ========== INICIALIZAR ========== */
 document.getElementById("qDate").value = getLocalISO();
+document.getElementById("mDate").value = getLocalISO();
 document.getElementById("qDate").addEventListener("change", function() { this.dataset.manual = "true"; });
 loadState();
 </script>
